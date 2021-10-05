@@ -29,40 +29,50 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 char msg[25];
 long count=0;
+const int SensorHumedad1 = 33; //mido la humedad al analogico GPIO0
 
 //************************
 //** F U N C I O N E S ***
 //************************
 
+//Prototipo de funciones
 void callback(char* topic, byte* payload, unsigned int length);
 void reconnect();
 void setup_wifi();
+float HumiditySensor();
 
+
+//SETUP
 void setup() {
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback);
+  pinMode(SensorHumedad1, INPUT);
 }
 
+//LOOP PRINCIPAL
 void loop() {
   if(!client.connected()){
     reconnect();
   }
 
+  //Envío de datos por MQTT
   if(client.connected()){
-    String str = "La cuenta es ->" + String(count);
+    String str = "La humedad es ->" + String(HumiditySensor()) + " %";
     str.toCharArray(msg,25);
     client.publish(root_topic_publish,msg);
-    count++;
-    delay(300);
-  }
+	}
+
+
   client.loop();
 }
+
 
 //*****************************
 //***    CONEXION WIFI      ***
 //*****************************
+
 void setup_wifi(){
 	delay(10);
 	// Nos conectamos a nuestra red Wifi
@@ -89,11 +99,10 @@ void setup_wifi(){
 //*****************************
 
 void reconnect() {
-
 	while (!client.connected()) {
 		Serial.print("Intentando conexión Mqtt...");
 		// Creamos un cliente ID
-		String clientId = "IOTICOS_H_W_";
+		String clientId = "BAZUCA_TEST";
 		clientId += String(random(0xffff), HEX);
 		// Intentamos conectar
 		if (client.connect(clientId.c_str(),mqttUser,mqttPassword)) {
@@ -127,5 +136,18 @@ void callback(char* topic, byte* payload, unsigned int length){
 	}
 	incoming.trim();
 	Serial.println("Mensaje -> " + incoming);
+}
 
+
+//*******************************
+//***     SENSOR HUMEDAD      ***
+//*******************************
+
+float HumiditySensor() {
+	float SensorValue = map(analogRead(SensorHumedad1), 4095, 1500, 0, 10000);
+	SensorValue = SensorValue/100; 
+	if(SensorValue>100) SensorValue = 100;
+	Serial.println(SensorValue);
+	delay(300);
+	return SensorValue;
 }
