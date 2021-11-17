@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <stdlib.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 //**************************************
 //*********** MQTT CONFIG **************
@@ -11,7 +13,7 @@ const int mqttPort = 1883;
 const char* mqttUser = "dqyoxjgo";
 const char* mqttPassword = "bDFPyIOx5Mln";
 const char* root_topic_subscribe ="bazuca/input";
-const char* root_topic_publish ="bazuca/output";
+//const char* root_topic_publish ="bazuca/output";
 
 
 //**************************************
@@ -28,8 +30,16 @@ const char* password =  "17156mscd";
 WiFiClient espClient;
 PubSubClient client(espClient);
 char msg[25];
-long count=0;
-const int SensorHumedad1 = 33; //mido la humedad al analogico GPIO0
+char msg1[25];
+const int SensorHumedad1 = 33; //mido la humedad al analogico GPIO33
+
+// GPIO where the DS18B20 is connected to
+const int oneWireBus = 32;    
+// Setup a oneWire instance to communicate with any OneWire devices
+OneWire oneWire(oneWireBus);
+// Pass our oneWire reference to Dallas Temperature sensor 
+DallasTemperature sensors(&oneWire);
+
 
 //************************
 //** F U N C I O N E S ***
@@ -40,15 +50,19 @@ void callback(char* topic, byte* payload, unsigned int length);
 void reconnect();
 void setup_wifi();
 float HumiditySensor();
+float TemperatureSensor();
 
 
 //SETUP
 void setup() {
-  Serial.begin(115200);
-  setup_wifi();
-  client.setServer(mqttServer, mqttPort);
-  client.setCallback(callback);
-  pinMode(SensorHumedad1, INPUT);
+	// Start the Serial Monitor
+	Serial.begin(115200);
+	// Start the DS18B20 sensor
+  	sensors.begin();
+	setup_wifi();
+	client.setServer(mqttServer, mqttPort);
+	client.setCallback(callback);
+	pinMode(SensorHumedad1, INPUT);
 }
 
 //LOOP PRINCIPAL
@@ -59,9 +73,26 @@ void loop() {
 
   //Envío de datos por MQTT
   if(client.connected()){
-    String str = "La humedad es ->" + String(HumiditySensor()) + " %";
+    //** Envío Humedad **
+	String str = String(HumiditySensor()) + " %";
     str.toCharArray(msg,25);
-    client.publish(root_topic_publish,msg);
+    //client.publish(root_topic_publish,msg);
+	client.publish("prototipo/humedad",msg);
+	//Serial.println(TemperatureSensor());
+
+	//** Envío Temperatura **
+	sensors.requestTemperatures(); 
+	float temperatureC = sensors.getTempCByIndex(0);
+	
+	String str1 = String(temperatureC) + " °C";
+    str1.toCharArray(msg1,25);
+	client.publish("prototipo/temperatura",msg1);
+	//Serial.print(temperatureC);
+  	//Serial.println("ºC");
+	//Serial.println(msg1);
+
+	//delay(300);
+
 	}
 
 
@@ -144,10 +175,15 @@ void callback(char* topic, byte* payload, unsigned int length){
 //*******************************
 
 float HumiditySensor() {
-	float SensorValue = map(analogRead(SensorHumedad1), 4095, 1500, 0, 10000);
+	float SensorValue = map(analogRead(SensorHumedad1), 4095, 1950, 0, 10000);
 	SensorValue = SensorValue/100; 
 	if(SensorValue>100) SensorValue = 100;
-	Serial.println(SensorValue);
-	delay(300);
+	//Serial.println(analogRead(SensorHumedad1));
+	//Serial.println(SensorValue);
+	//delay(300);
 	return SensorValue;
 }
+
+//**********************************
+//***     SENSOR TEMPERATURA     ***
+//**********************************
